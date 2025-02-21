@@ -292,26 +292,45 @@ const Groups: React.FC = () => {
       <div className="block lg:hidden">
         <div className="grid gap-4">
           {groups.map(group => (
-            <div key={group.id} className="bg-white rounded-lg shadow p-4">
-              <div className="flex justify-between items-start mb-2">
-                <div>
+            <div key={group.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="p-4 border-b">
+                <div className="flex justify-between items-start">
                   <h3 className="font-medium text-lg">{group.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{group.description || "Aucune description"}</p>
+                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-sm font-medium">
+                    {group.feePerSession}€/séance
+                  </span>
                 </div>
-                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium">
-                  {group.feePerSession}DT
-                </span>
+                <p className="text-sm text-gray-600 mt-1">{group.description || "Aucune description"}</p>
               </div>
-              <div className="flex gap-2 mt-3">
+
+              {/* Schedule List */}
+              <div className="px-4 py-2 bg-gray-50 border-b">
+                <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Horaires</h4>
+                <div className="space-y-1">
+                  {group.schedule.map((schedule, idx) => (
+                    <div key={idx} className="flex items-center text-sm">
+                      <span className="w-24 font-medium capitalize">{schedule.day}</span>
+                      <span className="text-gray-600">{schedule.time}</span>
+                    </div>
+                  ))}
+                  {group.schedule.length === 0 && (
+                    <p className="text-sm text-gray-500 italic">Aucun horaire défini</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="p-3 flex gap-2">
                 <button
                   onClick={() => handleEdit(group)}
-                  className="px-3 py-1.5 text-sm text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors flex-1"
+                  className="flex-1 px-3 py-1.5 text-sm text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                 >
                   Modifier
                 </button>
                 <button
                   onClick={() => handleDelete(group)}
-                  className="px-3 py-1.5 text-sm text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors flex-1"
+                  className="flex-1 px-3 py-1.5 text-sm text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
                 >
                   Supprimer
                 </button>

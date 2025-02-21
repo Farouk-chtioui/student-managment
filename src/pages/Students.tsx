@@ -315,38 +315,69 @@ const Students: React.FC = () => {
       <div className="block sm:hidden">
         <div className="space-y-4">
           {filteredStudents.map((student) => (
-            <div key={student.id} className="bg-white p-4 rounded-lg shadow-sm">
-              <div className="mb-2">
-                <h3 className="font-medium text-gray-900">{student.firstName} {student.lastName}</h3>
-                <p className="text-sm text-gray-500">
-                  Enregistré: {formatDateToFrench(new Date(student.dateOfRegistration))}
-                </p>
-                <span className={`inline-block mt-1 px-2 py-1 text-xs font-semibold rounded-full ${
-                  student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                }`}>
-                  {student.paid ? "Payé" : "Non payé"}
-                </span>
+            <div key={student.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {/* Student Info */}
+              <div className="p-4 border-b">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {student.firstName} {student.lastName}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Inscrit le: {formatDateToFrench(new Date(student.dateOfRegistration))}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                  }`}>
+                    {student.paid ? "Payé" : "Non payé"}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
+
+              {/* Details */}
+              <div className="px-4 py-3 bg-gray-50 border-b space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Groupe:</span>
+                  <span className="font-medium">{getGroupInfo(student.groupId).name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Cours suivis:</span>
+                  <span className="font-medium">{student.lessonsAttended}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Montant dû:</span>
+                  <span className="font-medium text-blue-600">
+                    {calculatePayment(
+                      student.groupId, 
+                      student.lessonsAttended,
+                      student.dateOfRegistration
+                    )}€
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="p-3 grid grid-cols-3 gap-2">
                 <button
                   onClick={() => togglePaymentStatus(student.id, student.paid)}
-                  className={`flex-1 px-3 py-1 rounded-md text-sm ${
+                  className={`px-3 py-2 text-sm rounded-md ${
                     student.paid
-                      ? "bg-red-100 text-red-700 hover:bg-red-200"
-                      : "bg-green-100 text-green-700 hover:bg-green-200"
+                      ? "bg-red-50 text-red-700 hover:bg-red-100"
+                      : "bg-green-50 text-green-700 hover:bg-green-100"
                   }`}
                 >
-                  {student.paid ? "Marquer comme non payé" : "Marquer comme payé"}
+                  {student.paid ? "Marquer non payé" : "Marquer payé"}
                 </button>
                 <button
                   onClick={() => handleEdit(student)}
-                  className="flex-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
+                  className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
                 >
                   Modifier
                 </button>
                 <button
                   onClick={() => deleteStudent(student.id)}
-                  className="flex-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm"
+                  className="px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100"
                 >
                   Supprimer
                 </button>
