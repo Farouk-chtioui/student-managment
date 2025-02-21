@@ -299,7 +299,7 @@ const Groups: React.FC = () => {
                   <p className="text-sm text-gray-500 mt-1">{group.description || "Aucune description"}</p>
                 </div>
                 <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium">
-                  {group.feePerSession}€
+                  {group.feePerSession}DT
                 </span>
               </div>
               <div className="flex gap-2 mt-3">
