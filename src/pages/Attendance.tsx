@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
 import { Student, Group, Attendance } from "../types";
 import GroupCache from '../utils/cache';
+import { frenchMonths, formatShortDateToFrench, getWeekDayInFrench } from '../utils/dateUtils';
 
 const AttendancePage: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -165,7 +166,7 @@ const AttendancePage: React.FC = () => {
               onChange={(e) => setCurrentMonth(Number(e.target.value))}
               className="p-2 border rounded w-full"
             >
-              {months.map((month, index) => (
+              {frenchMonths.map((month, index) => (
                 <option key={month} value={index}>{month}</option>
               ))}
             </select>
@@ -227,10 +228,10 @@ const AttendancePage: React.FC = () => {
                     {lessons.map((lesson, index) => (
                       <th key={index} className="px-6 py-3 text-left bg-gray-50">
                         <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          {lesson.day.charAt(0).toUpperCase() + lesson.day.slice(1)}
+                          {getWeekDayInFrench(new Date(currentYear, currentMonth, index + 1))}
                         </div>
                         <div className="text-sm font-bold text-gray-700 mt-1">
-                          {lesson.time}
+                          {formatShortDateToFrench(new Date(currentYear, currentMonth, index + 1))}
                         </div>
                       </th>
                     ))}

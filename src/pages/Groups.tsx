@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { Group, Schedule } from "../types";
 import GroupCache from '../utils/cache';
+import { formatDateToFrench } from '../utils/dateUtils';
 
 const Groups: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -49,6 +50,10 @@ const Groups: React.FC = () => {
       [field]: value 
     };
     setSchedules(newSchedules);
+  };
+
+  const removeSchedule = (index: number) => {
+    setSchedules(schedules.filter((_, i) => i !== index));
   };
 
   const addGroup = async () => {
@@ -126,7 +131,7 @@ const Groups: React.FC = () => {
     
     const historyMessage = feeHistory.length > 0 
       ? "\n\nHistorique des tarifs:\n" + feeHistory.map(h => 
-          `- ${h.feePerSession}€ (${new Date(h.startDate).toLocaleDateString()} - ${new Date(h.endDate).toLocaleDateString()})`
+          `- ${h.feePerSession}€ (${formatDateToFrench(new Date(h.startDate))} - ${formatDateToFrench(new Date(h.endDate))})`
         ).join('\n')
       : '';
 
@@ -147,145 +152,206 @@ const Groups: React.FC = () => {
       <h1 className="text-2xl lg:text-3xl font-bold mb-6">Gestion des Groupes</h1>
       
       <div className="bg-white rounded-lg shadow p-4 lg:p-6 mb-6">
-        <h2 className="text-lg lg:text-xl font-semibold mb-4">
+        {/* Form Header */}
+        <h2 className="text-lg lg:text-xl font-semibold mb-6">
           {isEditing ? "Modifier le Groupe" : "Ajouter un Nouveau Groupe"}
         </h2>
-        <div className="space-y-4">
+
+        <div className="space-y-6">
+          {/* Basic Info */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <input
-              type="text"
-              placeholder="Nom du groupe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="p-2 border rounded w-full"
-            />
-            <input
-              type="number"
-              placeholder="Tarif par séance"
-              value={feePerSession}
-              onChange={(e) => setFeePerSession(Number(e.target.value))}
-              className="p-2 border rounded w-full"
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Nom du groupe</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="p-2.5 border rounded-md w-full focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Tarif par séance</label>
+              <input
+                type="number"
+                value={feePerSession}
+                onChange={(e) => setFeePerSession(Number(e.target.value))}
+                className="p-2.5 border rounded-md w-full focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+              rows={2}
             />
           </div>
-          <textarea
-            placeholder="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full p-2 border rounded"
-          />
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium">Horaires</h3>
+
+          {/* Schedule Section with Modern List */}
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-base font-semibold text-gray-900">Horaires de cours</h3>
               <button
                 type="button"
                 onClick={addSchedule}
-                className="text-blue-500 text-sm"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
               >
-                + Ajouter un horaire ({currentDay})
+                <span className="mr-1.5 text-lg">+</span>
+                Ajouter un horaire
               </button>
             </div>
-            
-            {schedules.map((schedule, index) => (
-              <div key={index} className="flex gap-2">
-                <select
-                  value={schedule.day}
-                  onChange={(e) => updateSchedule(index, 'day', e.target.value)}
-                  className={`flex-1 p-2 border rounded ${
-                    schedules.findIndex(
-                      (s, i) => i !== index && s.day === schedule.day
-                    ) !== -1 ? 'bg-gray-100' : ''
-                  }`}
+
+            <div className="space-y-3">
+              {schedules.map((schedule, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-all"
                 >
-                  {weekDays.map(day => (
-                    <option key={day} value={day}>
-                      {day.charAt(0).toUpperCase() + day.slice(1)}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="time"
-                  value={schedule.time}
-                  onChange={(e) => updateSchedule(index, 'time', e.target.value)}
-                  className="flex-1 p-2 border rounded"
-                />
-              </div>
-            ))}
+                  <div className="flex-1 flex items-center gap-4">
+                    <div className="w-1/2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Jour</label>
+                      <select
+                        value={schedule.day}
+                        onChange={(e) => updateSchedule(index, 'day', e.target.value)}
+                        className={`w-full p-2.5 text-base font-medium rounded-lg border ${
+                          schedules.findIndex((s, i) => i !== index && s.day === schedule.day) !== -1 
+                            ? 'border-yellow-300 bg-yellow-50' 
+                            : 'border-gray-200 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        {weekDays.map(day => (
+                          <option key={day} value={day}>
+                            {day.charAt(0).toUpperCase() + day.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="w-1/2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Heure</label>
+                      <input
+                        type="time"
+                        value={schedule.time}
+                        onChange={(e) => updateSchedule(index, 'time', e.target.value)}
+                        className="w-full p-2.5 text-base font-medium border-gray-200 rounded-lg bg-white hover:border-blue-300"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => removeSchedule(index)}
+                    className="self-end p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Supprimer cet horaire"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {schedules.length === 0 && (
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                  <p className="text-sm">Aucun horaire défini</p>
+                  <p className="text-xs text-gray-400 mt-1">Cliquez sur "Ajouter un horaire" pour commencer</p>
+                </div>
+              )}
+            </div>
           </div>
-          <button
-            onClick={isEditing ? handleUpdate : addGroup}
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-          >
-            {isEditing ? "Mettre à jour" : "Ajouter le Groupe"}
-          </button>
-          {isEditing && (
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setEditingGroup(null);
-                clearForm();
-              }}
-              className="w-full mt-2 bg-gray-500 text-white p-2 rounded hover:bg-gray-600"
-            >
-              Annuler
-            </button>
-          )}
+
+          {/* Action Buttons - Centered */}
+          <div className="flex justify-center pt-4">
+            <div className="space-x-3">
+              <button
+                onClick={isEditing ? handleUpdate : addGroup}
+                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-colors"
+              >
+                {isEditing ? "Mettre à jour" : "Ajouter le groupe"}
+              </button>
+              {isEditing && (
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditingGroup(null);
+                    clearForm();
+                  }}
+                  className="px-6 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Annuler
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Mobile View */}
-      <div className="block lg:hidden space-y-4">
-        {groups.map(group => (
-          <div key={group.id} className="bg-white rounded-lg shadow p-4">
-            <div className="mb-3">
-              <h3 className="font-medium text-lg">{group.name}</h3>
-              <p className="text-gray-600">{group.description}</p>
-              <p className="text-sm font-medium mt-2">{group.feePerSession}€ par séance</p>
+      <div className="block lg:hidden">
+        <div className="grid gap-4">
+          {groups.map(group => (
+            <div key={group.id} className="bg-white rounded-lg shadow p-4">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-medium text-lg">{group.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{group.description || "Aucune description"}</p>
+                </div>
+                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium">
+                  {group.feePerSession}€
+                </span>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleEdit(group)}
+                  className="px-3 py-1.5 text-sm text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors flex-1"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => handleDelete(group)}
+                  className="px-3 py-1.5 text-sm text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors flex-1"
+                >
+                  Supprimer
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleEdit(group)}
-                className="flex-1 px-3 py-2 text-blue-700 bg-blue-50 rounded-md"
-              >
-                Modifier
-              </button>
-              <button
-                onClick={() => handleDelete(group)}
-                className="flex-1 px-3 py-2 text-red-700 bg-red-50 rounded-md"
-              >
-                Supprimer
-              </button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* Desktop View */}
       <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full">
+        <table className="min-w-full divide-y divide-gray-200">
           <thead>
             <tr className="bg-gray-50">
-              <th className="px-6 py-3 text-left">Nom</th>
-              <th className="px-6 py-3 text-left">Tarif</th>
-              <th className="px-6 py-3 text-left">Description</th>
-              <th className="px-6 py-3 text-left">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarif</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-200">
             {groups.map(group => (
-              <tr key={group.id} className="border-t">
-                <td className="px-6 py-4">{group.name}</td>
-                <td className="px-6 py-4">{group.feePerSession}€</td>
-                <td className="px-6 py-4">{group.description}</td>
-                <td className="px-6 py-4">
+              <tr key={group.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">{group.name}</td>
+                <td className="px-4 py-3">
+                  <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm">
+                    {group.feePerSession}€
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-gray-500 text-sm">{group.description}</td>
+                <td className="px-4 py-3 text-right space-x-2">
                   <button
                     onClick={() => handleEdit(group)}
-                    className="text-blue-500 hover:text-blue-700 mr-2"
+                    className="px-3 py-1 text-sm text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
                   >
                     Modifier
                   </button>
                   <button
                     onClick={() => handleDelete(group)}
-                    className="text-red-500 hover:text-red-700"
+                    className="px-3 py-1 text-sm text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors"
                   >
                     Supprimer
                   </button>

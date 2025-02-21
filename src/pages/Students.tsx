@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { Student, Group } from "../types";
 import GroupCache from '../utils/cache';
+import { formatDateToFrench } from '../utils/dateUtils';
 
 const Students: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -317,7 +318,9 @@ const Students: React.FC = () => {
             <div key={student.id} className="bg-white p-4 rounded-lg shadow-sm">
               <div className="mb-2">
                 <h3 className="font-medium text-gray-900">{student.firstName} {student.lastName}</h3>
-                <p className="text-sm text-gray-500">Enregistré: {student.dateOfRegistration}</p>
+                <p className="text-sm text-gray-500">
+                  Enregistré: {formatDateToFrench(new Date(student.dateOfRegistration))}
+                </p>
                 <span className={`inline-block mt-1 px-2 py-1 text-xs font-semibold rounded-full ${
                   student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                 }`}>
