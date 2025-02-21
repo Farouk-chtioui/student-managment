@@ -4,7 +4,6 @@ export interface Student {
   lastName: string;
   dateOfRegistration: string;
   paid: boolean;
-  paymentMonth: string;
   groupId: string;
   lessonsAttended: number;
 }

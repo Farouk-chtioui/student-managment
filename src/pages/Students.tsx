@@ -9,6 +9,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { Student, Group } from "../types";
+import GroupCache from '../utils/cache';
 
 const Students: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
@@ -16,7 +17,6 @@ const Students: React.FC = () => {
   const [lastName, setLastName] = useState("");
   const [dateOfRegistration, setDateOfRegistration] = useState("");
   const [paid, setPaid] = useState(false);
-  const [paymentMonth, setPaymentMonth] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [lessonsAttended, setLessonsAttended] = useState(0);
@@ -50,14 +50,36 @@ const Students: React.FC = () => {
     fetchGroups();
   }, []);
 
-  // Calculate Payment
-  const calculatePayment = (group: Group, lessons: number) => {
-    return group.feePerSession * lessons;
+  const getGroupInfo = (groupId: string) => {
+    const activeGroup = groups.find(g => g.id === groupId);
+    if (activeGroup) return activeGroup;
+
+    // Try to get from cache if not found in active groups
+    const cachedGroup = GroupCache.getDeletedGroup(groupId);
+    if (cachedGroup) {
+      return {
+        ...cachedGroup,
+        name: `${cachedGroup.name} (Archived)`,
+      };
+    }
+
+    return { name: 'Groupe inconnu', feePerSession: 0 };
+  };
+
+  const calculatePayment = (groupId: string, lessons: number, paymentDate: string) => {
+    const activeGroup = groups.find(g => g.id === groupId);
+    if (activeGroup) {
+      return activeGroup.feePerSession * lessons;
+    }
+
+    // Get historical fee for deleted group
+    const historicalFee = GroupCache.getFeeForDate(groupId, paymentDate);
+    return historicalFee * lessons;
   };
 
   // Add Student to Firestore
   const addStudent = async () => {
-    if (!firstName || !lastName || !dateOfRegistration || !paymentMonth || !selectedGroup) {
+    if (!firstName || !lastName || !dateOfRegistration || !selectedGroup) {
       alert("Veuillez remplir tous les champs obligatoires");
       return;
     }
@@ -66,7 +88,6 @@ const Students: React.FC = () => {
       lastName,
       dateOfRegistration,
       paid,
-      paymentMonth,
       groupId: selectedGroup,
       lessonsAttended
     });
@@ -93,7 +114,6 @@ const Students: React.FC = () => {
     setLastName(student.lastName);
     setDateOfRegistration(student.dateOfRegistration);
     setPaid(student.paid);
-    setPaymentMonth(student.paymentMonth);
     setSelectedGroup(student.groupId);
     setLessonsAttended(student.lessonsAttended);
     setIsEditing(true);
@@ -107,7 +127,6 @@ const Students: React.FC = () => {
       lastName,
       dateOfRegistration,
       paid,
-      paymentMonth,
       groupId: selectedGroup,
       lessonsAttended
     });
@@ -123,7 +142,6 @@ const Students: React.FC = () => {
     setLastName("");
     setDateOfRegistration("");
     setPaid(false);
-    setPaymentMonth("");
     setSelectedGroup("");
     setLessonsAttended(0);
   };
@@ -141,78 +159,80 @@ const Students: React.FC = () => {
         <h2 className="text-xl font-semibold mb-4">
           {isEditing ? "Modifier l'étudiant" : "Ajouter un Nouvel Étudiant"}
         </h2>
-        
-        {/* Field explanations */}
-        <div className="mb-4 p-4 bg-blue-50 rounded-md text-sm text-blue-700">
-          <h3 className="font-semibold mb-2">Guide des champs:</h3>
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Prénom & Nom - Identité de l'étudiant</li>
-            <li>Date d'inscription - Date de début des cours</li>
-            <li>Mois de paiement - Mois concerné par le paiement</li>
-            <li>Groupe - Classe ou niveau de l'étudiant</li>
-            <li>Nombre de cours - Séances suivies dans le mois</li>
-          </ul>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">
+              Prénom
+              <span className="ml-1 text-xs text-blue-600">(Identité de l'étudiant)</span>
+            </label>
             <input
               type="text"
               placeholder="Prénom"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               className="p-2 border rounded w-full"
-              onFocus={() => setShowTooltip("firstName")}
-              onBlur={() => setShowTooltip("")}
             />
-            {showTooltip === "firstName" && (
-              <div className="absolute z-10 bg-black text-white p-2 rounded text-sm mt-1">
-                Prénom de l'étudiant
-              </div>
-            )}
           </div>
-          <input
-            type="text"
-            placeholder="Nom de famille"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="p-2 border rounded"
-          />
-          <input
-            type="date"
-            className="p-2 border rounded"
-            value={dateOfRegistration}
-            onChange={(e) => setDateOfRegistration(e.target.value)}
-          />
-          <select
-            className="p-2 border rounded"
-            value={paymentMonth}
-            onChange={(e) => setPaymentMonth(e.target.value)}
-          >
-            <option value="">Sélectionner un Mois de Paiement</option>
-            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(
-              (month) => (
-                <option key={month} value={month}>{month}</option>
-              )
-            )}
-          </select>
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className="p-2 border rounded"
-          >
-            <option value="">Sélectionner un Groupe</option>
-            {groups.map(group => (
-              <option key={group.id} value={group.id}>{group.name}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            placeholder="Nombre de cours"
-            value={lessonsAttended}
-            onChange={(e) => setLessonsAttended(Number(e.target.value))}
-            className="p-2 border rounded"
-          />
+
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">
+              Nom de famille
+              <span className="ml-1 text-xs text-blue-600">(Identité de l'étudiant)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Nom de famille"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">
+              Date d'inscription
+              <span className="ml-1 text-xs text-blue-600">(Date de début des cours)</span>
+            </label>
+            <input
+              type="date"
+              value={dateOfRegistration}
+              onChange={(e) => setDateOfRegistration(e.target.value)}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">
+              Groupe
+              <span className="ml-1 text-xs text-blue-600">(Classe ou niveau de l'étudiant)</span>
+            </label>
+            <select
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              className="p-2 border rounded w-full"
+            >
+              <option value="">Sélectionner un Groupe</option>
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">
+              Nombre de cours
+              <span className="ml-1 text-xs text-blue-600">(Séances suivies dans le mois)</span>
+            </label>
+            <input
+              type="number"
+              placeholder="Nombre de cours"
+              value={lessonsAttended}
+              onChange={(e) => setLessonsAttended(Number(e.target.value))}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -221,7 +241,10 @@ const Students: React.FC = () => {
               onChange={(e) => setPaid(e.target.checked)}
               className="w-4 h-4 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="paid">Payé</label>
+            <label htmlFor="paid" className="text-sm text-gray-600">
+              Payé
+              <span className="ml-1 text-xs text-blue-600">(Statut du paiement)</span>
+            </label>
           </div>
         </div>
         <div className="flex gap-2 mt-4">
@@ -295,7 +318,6 @@ const Students: React.FC = () => {
               <div className="mb-2">
                 <h3 className="font-medium text-gray-900">{student.firstName} {student.lastName}</h3>
                 <p className="text-sm text-gray-500">Enregistré: {student.dateOfRegistration}</p>
-                <p className="text-sm text-gray-500">Mois: {student.paymentMonth}</p>
                 <span className={`inline-block mt-1 px-2 py-1 text-xs font-semibold rounded-full ${
                   student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                 }`}>
@@ -352,13 +374,17 @@ const Students: React.FC = () => {
                     <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {groups.find(group => group.id === student.groupId)?.name || "N/A"}
+                    {getGroupInfo(student.groupId).name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {student.lessonsAttended}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {calculatePayment(groups.find(group => group.id === student.groupId)!, student.lessonsAttended)}
+                    {calculatePayment(
+                      student.groupId, 
+                      student.lessonsAttended,
+                      student.dateOfRegistration
+                    )}€
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
