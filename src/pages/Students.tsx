@@ -1,5 +1,3 @@
-// Students.tsx
-
 import { useState, useEffect } from "react";
 import { db } from "../firebase";
 import {
@@ -8,10 +6,7 @@ import {
   getDocs,
   updateDoc,
   deleteDoc,
-  doc,
-  query,
-  where,
-  getDoc
+  doc
 } from "firebase/firestore";
 import { Student, Group } from "../types";
 import { formatDateToFrench } from '../utils/dateUtils';
@@ -20,113 +15,176 @@ const Students: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
-  // Form fields
+  // Form fields for adding/updating a student:
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dateOfRegistration, setDateOfRegistration] = useState("");
   const [paid, setPaid] = useState(false);
   const [lessonsAttended, setLessonsAttended] = useState(0);
   const [montant, setMontant] = useState(0);
-
+  // This must store the group doc ID, not the name
   const [selectedGroup, setSelectedGroup] = useState("");
+
+  // For filtering the table by group
   const [filterGroup, setFilterGroup] = useState("");
+
+  // Track whether we’re editing an existing student
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Add helper after state declarations
-  const computePaid = (s: Student) => s.lessonsAttended > 0 && s.montant === 0 ? true : s.paid;
+  // Helper: if a student’s `lessonsAttended > 0` but `montant == 0`, consider them “paid”
+  // You can adjust or remove this if your logic differs
+  const computePaid = (s: Student) => {
+    return s.lessonsAttended > 0 && s.montant === 0 ? true : s.paid;
+  };
 
-  // Load
   useEffect(() => {
     fetchStudents();
     fetchGroups();
   }, []);
 
+  // Load students from Firestore
   const fetchStudents = async () => {
-    const snap = await getDocs(collection(db, "students"));
-    const list = snap.docs.map(d => {
-      const data = d.data() as Partial<Student>;
-      return {
-        id: d.id,
-        firstName: data.firstName || "",
-        lastName: data.lastName || "",
-        dateOfRegistration: data.dateOfRegistration || "",
-        paid: !!data.paid,
-        groupId: data.groupId || "",
-        lessonsAttended: data.lessonsAttended || 0,
-        montant: data.montant || 0
-      } as Student;
-    });
-    setStudents(list);
+    try {
+      const snap = await getDocs(collection(db, "students"));
+      const list = snap.docs.map(d => {
+        const data = d.data() as Partial<Student>;
+        return {
+          id: d.id,
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          dateOfRegistration: data.dateOfRegistration || "",
+          paid: !!data.paid,
+          groupId: data.groupId || "",
+          lessonsAttended: data.lessonsAttended || 0,
+          montant: data.montant || 0
+        } as Student;
+      });
+      setStudents(list);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    }
   };
 
+  // Load groups from Firestore
   const fetchGroups = async () => {
-    const snap = await getDocs(collection(db, "groups"));
-    const list = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    })) as Group[];
-    setGroups(list);
+    try {
+      const snap = await getDocs(collection(db, "groups"));
+      const groupList = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Group[];
+      setGroups(groupList);
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+    }
   };
 
+  /**
+   * Helper to find the group's name by ID so we can display it
+   */
+  const getGroupName = (groupId: string): string => {
+    const g = groups.find(x => x.id === groupId);
+    return g ? g.name : groupId; // fallback if not found
+  };
+
+  /**
+   * Add a new student doc to Firestore
+   * We store the actual group doc ID in `groupId`
+   */
   const addStudent = async () => {
+    // Basic validation
     if (!firstName || !lastName || !dateOfRegistration || !selectedGroup) {
       alert("Veuillez remplir tous les champs obligatoires");
       return;
     }
-    await addDoc(collection(db, "students"), {
-      firstName,
-      lastName,
-      dateOfRegistration,
-      paid,
-      groupId: selectedGroup,
-      lessonsAttended,
-      montant
-    });
-    fetchStudents();
-    clearForm();
+    try {
+      await addDoc(collection(db, "students"), {
+        firstName,
+        lastName,
+        dateOfRegistration,
+        paid,
+        groupId: selectedGroup, // doc ID, not name
+        lessonsAttended,
+        montant
+      });
+      fetchStudents();
+      clearForm();
+    } catch (error) {
+      console.error("Error adding student:", error);
+      alert("Une erreur est survenue lors de l'ajout de l'étudiant");
+    }
   };
 
+  /**
+   * Start editing an existing student
+   */
   const handleEdit = (stu: Student) => {
     setEditingStudent(stu);
     setFirstName(stu.firstName);
     setLastName(stu.lastName);
     setDateOfRegistration(stu.dateOfRegistration);
     setPaid(stu.paid);
-    setSelectedGroup(stu.groupId);
+    setSelectedGroup(stu.groupId); // must store ID
     setLessonsAttended(stu.lessonsAttended);
     setMontant(stu.montant);
     setIsEditing(true);
   };
 
+  /**
+   * Update an existing student's doc
+   */
   const handleUpdate = async () => {
     if (!editingStudent) return;
-    await updateDoc(doc(db, "students", editingStudent.id), {
-      firstName,
-      lastName,
-      dateOfRegistration,
-      paid,
-      groupId: selectedGroup,
-      lessonsAttended,
-      montant
-    });
-    setIsEditing(false);
-    setEditingStudent(null);
-    clearForm();
-    fetchStudents();
+    try {
+      await updateDoc(doc(db, "students", editingStudent.id), {
+        firstName,
+        lastName,
+        dateOfRegistration,
+        paid,
+        groupId: selectedGroup, // doc ID
+        lessonsAttended,
+        montant
+      });
+      setIsEditing(false);
+      setEditingStudent(null);
+      clearForm();
+      fetchStudents();
+    } catch (error) {
+      console.error("Error updating student:", error);
+      alert("Une erreur est survenue lors de la mise à jour de l'étudiant");
+    }
   };
 
+  /**
+   * Toggle the student's paid boolean if you want that feature
+   */
   const togglePaidStatus = async (id: string, curPaid: boolean) => {
-    // Just flips "paid"
-    await updateDoc(doc(db, "students", id), { paid: !curPaid });
-    fetchStudents();
+    try {
+      await updateDoc(doc(db, "students", id), { paid: !curPaid });
+      fetchStudents();
+    } catch (error) {
+      console.error("Error toggling paid status:", error);
+      alert("Une erreur est survenue lors de la mise à jour du statut payé");
+    }
   };
 
+  /**
+   * Delete a student doc
+   */
   const deleteStudent = async (id: string) => {
-    await deleteDoc(doc(db, "students", id));
-    fetchStudents();
+    try {
+      await deleteDoc(doc(db, "students", id));
+      fetchStudents();
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      alert("Une erreur est survenue lors de la suppression de l'étudiant");
+    }
   };
 
+  /**
+   * Reset form fields
+   */
   const clearForm = () => {
     setFirstName("");
     setLastName("");
@@ -137,6 +195,7 @@ const Students: React.FC = () => {
     setSelectedGroup("");
   };
 
+  // Filter by group ID
   const filteredStudents = students.filter(s =>
     filterGroup ? s.groupId === filterGroup : true
   );
@@ -145,14 +204,14 @@ const Students: React.FC = () => {
     <div>
       <h1 className="text-3xl font-bold mb-6">Gestion des Étudiants</h1>
 
-      {/* Add/Update */}
+      {/* Add or update Student form */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <h2 className="text-xl font-semibold mb-4">
           {isEditing ? "Modifier l'Étudiant" : "Ajouter un Nouvel Étudiant"}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* firstName */}
+          {/* First name */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Prénom</label>
             <input
@@ -163,7 +222,8 @@ const Students: React.FC = () => {
               className="p-2 border rounded w-full"
             />
           </div>
-          {/* lastName */}
+
+          {/* Last name */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Nom de famille</label>
             <input
@@ -174,7 +234,8 @@ const Students: React.FC = () => {
               className="p-2 border rounded w-full"
             />
           </div>
-          {/* dateOfRegistration */}
+
+          {/* Date of registration */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Date d'inscription</label>
             <input
@@ -184,7 +245,8 @@ const Students: React.FC = () => {
               className="p-2 border rounded w-full"
             />
           </div>
-          {/* groupId */}
+
+          {/* Group ID -> store doc ID */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Groupe</label>
             <select
@@ -194,10 +256,13 @@ const Students: React.FC = () => {
             >
               <option value="">Sélectionner un Groupe</option>
               {groups.map(g => (
-                <option key={g.id} value={g.name}>{g.name}</option>
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
               ))}
             </select>
           </div>
+
           {/* lessonsAttended */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Cours suivis</label>
@@ -208,6 +273,7 @@ const Students: React.FC = () => {
               className="p-2 border rounded w-full"
             />
           </div>
+
           {/* montant */}
           <div className="space-y-1">
             <label className="block text-sm text-gray-600">Montant (ce que l'étudiant doit)</label>
@@ -218,6 +284,7 @@ const Students: React.FC = () => {
               className="p-2 border rounded w-full"
             />
           </div>
+
           {/* paid checkbox */}
           <div className="flex items-center space-x-2">
             <input
@@ -255,7 +322,7 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter */}
+      {/* Filter students by group ID */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-medium">Filtres:</h3>
@@ -266,13 +333,15 @@ const Students: React.FC = () => {
           >
             <option value="">Tous les groupes</option>
             {groups.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Quick Stats */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="text-center p-3 bg-blue-50 rounded">
@@ -294,7 +363,7 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile */}
+      {/* Mobile list */}
       <div className="block sm:hidden">
         <div className="space-y-4">
           {filteredStudents.map(stu => {
@@ -311,9 +380,11 @@ const Students: React.FC = () => {
                         Inscrit le: {formatDateToFrench(new Date(stu.dateOfRegistration))}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      isPaid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                    }`}>
+                    <span
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                        isPaid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
                       {isPaid ? "Payé" : "Non payé"}
                     </span>
                   </div>
@@ -322,7 +393,7 @@ const Students: React.FC = () => {
                 <div className="px-4 py-3 bg-gray-50 border-b space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Groupe:</span>
-                    <span className="font-medium">{stu.groupId}</span>
+                    <span className="font-medium">{getGroupName(stu.groupId)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Cours suivis:</span>
@@ -354,7 +425,7 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Desktop */}
+      {/* Desktop table */}
       <div className="hidden sm:block bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -391,7 +462,7 @@ const Students: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {stu.groupId}
+                      {getGroupName(stu.groupId)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {stu.lessonsAttended}
@@ -400,11 +471,13 @@ const Students: React.FC = () => {
                       {stu.montant}DT
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        isPaid
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}>
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          isPaid
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
                         {isPaid ? "Payé" : "Non payé"}
                       </span>
                     </td>
