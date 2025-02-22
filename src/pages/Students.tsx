@@ -1,5 +1,7 @@
+// Students.tsx
+
 import { useState, useEffect } from "react";
-import { db, auth } from "../firebase";
+import { db } from "../firebase";
 import {
   collection,
   addDoc,
@@ -7,78 +9,63 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  query,
+  where,
+  getDoc
 } from "firebase/firestore";
 import { Student, Group } from "../types";
-import GroupCache from '../utils/cache';
 import { formatDateToFrench } from '../utils/dateUtils';
 
 const Students: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  // Form fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [dateOfRegistration, setDateOfRegistration] = useState("");
   const [paid, setPaid] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState("");
   const [lessonsAttended, setLessonsAttended] = useState(0);
-  const [filterGroup, setFilterGroup] = useState<string>("");
-  const [showTooltip, setShowTooltip] = useState<string>("");
+  const [montant, setMontant] = useState(0);
+
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [filterGroup, setFilterGroup] = useState("");
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Fetch Students from Firestore
-  const fetchStudents = async () => {
-    const querySnapshot = await getDocs(collection(db, "students"));
-    const studentList: Student[] = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Student[];
-    setStudents(studentList);
-  };
-
-  // Fetch Groups
-  const fetchGroups = async () => {
-    const querySnapshot = await getDocs(collection(db, "groups"));
-    const groupList = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Group[];
-    setGroups(groupList);
-  };
-
+  // Load
   useEffect(() => {
     fetchStudents();
     fetchGroups();
   }, []);
 
-  const getGroupInfo = (groupId: string) => {
-    const activeGroup = groups.find(g => g.id === groupId);
-    if (activeGroup) return activeGroup;
-
-    // Try to get from cache if not found in active groups
-    const cachedGroup = GroupCache.getDeletedGroup(groupId);
-    if (cachedGroup) {
+  const fetchStudents = async () => {
+    const snap = await getDocs(collection(db, "students"));
+    const list = snap.docs.map(d => {
+      const data = d.data() as Partial<Student>;
       return {
-        ...cachedGroup,
-        name: `${cachedGroup.name} (Archived)`,
-      };
-    }
-
-    return { name: 'Groupe inconnu', feePerSession: 0 };
+        id: d.id,
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        dateOfRegistration: data.dateOfRegistration || "",
+        paid: !!data.paid,
+        groupId: data.groupId || "",
+        lessonsAttended: data.lessonsAttended || 0,
+        montant: data.montant || 0
+      } as Student;
+    });
+    setStudents(list);
   };
 
-  const calculatePayment = (groupId: string, lessons: number, paymentDate: string) => {
-    const activeGroup = groups.find(g => g.id === groupId);
-    if (activeGroup) {
-      return activeGroup.feePerSession * lessons;
-    }
-
-    // Get historical fee for deleted group
-    const historicalFee = GroupCache.getFeeForDate(groupId, paymentDate);
-    return historicalFee * lessons;
+  const fetchGroups = async () => {
+    const snap = await getDocs(collection(db, "groups"));
+    const list = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })) as Group[];
+    setGroups(list);
   };
 
-  // Add Student to Firestore
   const addStudent = async () => {
     if (!firstName || !lastName || !dateOfRegistration || !selectedGroup) {
       alert("Veuillez remplir tous les champs obligatoires");
@@ -90,51 +77,50 @@ const Students: React.FC = () => {
       dateOfRegistration,
       paid,
       groupId: selectedGroup,
-      lessonsAttended
+      lessonsAttended,
+      montant
     });
     fetchStudents();
     clearForm();
   };
 
-  // Update Student Payment Status
-  const togglePaymentStatus = async (id: string, currentStatus: boolean) => {
-    const studentRef = doc(db, "students", id);
-    await updateDoc(studentRef, { paid: !currentStatus });
-    fetchStudents();
-  };
-
-  // Delete Student
-  const deleteStudent = async (id: string) => {
-    await deleteDoc(doc(db, "students", id));
-    fetchStudents();
-  };
-
-  const handleEdit = (student: Student) => {
-    setEditingStudent(student);
-    setFirstName(student.firstName);
-    setLastName(student.lastName);
-    setDateOfRegistration(student.dateOfRegistration);
-    setPaid(student.paid);
-    setSelectedGroup(student.groupId);
-    setLessonsAttended(student.lessonsAttended);
+  const handleEdit = (stu: Student) => {
+    setEditingStudent(stu);
+    setFirstName(stu.firstName);
+    setLastName(stu.lastName);
+    setDateOfRegistration(stu.dateOfRegistration);
+    setPaid(stu.paid);
+    setSelectedGroup(stu.groupId);
+    setLessonsAttended(stu.lessonsAttended);
+    setMontant(stu.montant);
     setIsEditing(true);
   };
 
   const handleUpdate = async () => {
     if (!editingStudent) return;
-
     await updateDoc(doc(db, "students", editingStudent.id), {
       firstName,
       lastName,
       dateOfRegistration,
       paid,
       groupId: selectedGroup,
-      lessonsAttended
+      lessonsAttended,
+      montant
     });
-
     setIsEditing(false);
     setEditingStudent(null);
     clearForm();
+    fetchStudents();
+  };
+
+  const togglePaidStatus = async (id: string, curPaid: boolean) => {
+    // Just flips "paid"
+    await updateDoc(doc(db, "students", id), { paid: !curPaid });
+    fetchStudents();
+  };
+
+  const deleteStudent = async (id: string) => {
+    await deleteDoc(doc(db, "students", id));
     fetchStudents();
   };
 
@@ -143,111 +129,107 @@ const Students: React.FC = () => {
     setLastName("");
     setDateOfRegistration("");
     setPaid(false);
-    setSelectedGroup("");
     setLessonsAttended(0);
+    setMontant(0);
+    setSelectedGroup("");
   };
 
-  const filteredStudents = students.filter(student => 
-    filterGroup ? student.groupId === filterGroup : true
+  const filteredStudents = students.filter(s =>
+    filterGroup ? s.groupId === filterGroup : true
   );
 
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Gestion des Étudiants</h1>
-      
-      {/* Add Student Form */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+
+      {/* Add/Update */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
         <h2 className="text-xl font-semibold mb-4">
-          {isEditing ? "Modifier l'étudiant" : "Ajouter un Nouvel Étudiant"}
+          {isEditing ? "Modifier l'Étudiant" : "Ajouter un Nouvel Étudiant"}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* firstName */}
           <div className="space-y-1">
-            <label className="block text-sm text-gray-600">
-              Prénom
-              <span className="ml-1 text-xs text-blue-600">(Identité de l'étudiant)</span>
-            </label>
+            <label className="block text-sm text-gray-600">Prénom</label>
             <input
               type="text"
               placeholder="Prénom"
               value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              onChange={e => setFirstName(e.target.value)}
               className="p-2 border rounded w-full"
             />
           </div>
-
+          {/* lastName */}
           <div className="space-y-1">
-            <label className="block text-sm text-gray-600">
-              Nom de famille
-              <span className="ml-1 text-xs text-blue-600">(Identité de l'étudiant)</span>
-            </label>
+            <label className="block text-sm text-gray-600">Nom de famille</label>
             <input
               type="text"
               placeholder="Nom de famille"
               value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              onChange={e => setLastName(e.target.value)}
               className="p-2 border rounded w-full"
             />
           </div>
-
+          {/* dateOfRegistration */}
           <div className="space-y-1">
-            <label className="block text-sm text-gray-600">
-              Date d'inscription
-              <span className="ml-1 text-xs text-blue-600">(Date de début des cours)</span>
-            </label>
+            <label className="block text-sm text-gray-600">Date d'inscription</label>
             <input
               type="date"
               value={dateOfRegistration}
-              onChange={(e) => setDateOfRegistration(e.target.value)}
+              onChange={e => setDateOfRegistration(e.target.value)}
               className="p-2 border rounded w-full"
             />
           </div>
-
+          {/* groupId */}
           <div className="space-y-1">
-            <label className="block text-sm text-gray-600">
-              Groupe
-              <span className="ml-1 text-xs text-blue-600">(Classe ou niveau de l'étudiant)</span>
-            </label>
+            <label className="block text-sm text-gray-600">Groupe</label>
             <select
               value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
+              onChange={e => setSelectedGroup(e.target.value)}
               className="p-2 border rounded w-full"
             >
               <option value="">Sélectionner un Groupe</option>
-              {groups.map(group => (
-                <option key={group.id} value={group.id}>{group.name}</option>
+              {groups.map(g => (
+                <option key={g.id} value={g.name}>{g.name}</option>
               ))}
             </select>
           </div>
-
+          {/* lessonsAttended */}
           <div className="space-y-1">
-            <label className="block text-sm text-gray-600">
-              Nombre de cours
-              <span className="ml-1 text-xs text-blue-600">(Séances suivies dans le mois)</span>
-            </label>
+            <label className="block text-sm text-gray-600">Cours suivis</label>
             <input
               type="number"
-              placeholder="Nombre de cours"
               value={lessonsAttended}
-              onChange={(e) => setLessonsAttended(Number(e.target.value))}
+              onChange={e => setLessonsAttended(Number(e.target.value))}
               className="p-2 border rounded w-full"
             />
           </div>
-
+          {/* montant */}
+          <div className="space-y-1">
+            <label className="block text-sm text-gray-600">Montant (ce que l'étudiant doit)</label>
+            <input
+              type="number"
+              value={montant}
+              onChange={e => setMontant(Number(e.target.value))}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+          {/* paid checkbox */}
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
               id="paid"
               checked={paid}
-              onChange={(e) => setPaid(e.target.checked)}
+              onChange={e => setPaid(e.target.checked)}
               className="w-4 h-4 text-blue-600 focus:ring-blue-500"
             />
             <label htmlFor="paid" className="text-sm text-gray-600">
               Payé
-              <span className="ml-1 text-xs text-blue-600">(Statut du paiement)</span>
             </label>
           </div>
         </div>
+
         <div className="flex gap-2 mt-4">
           <button
             onClick={isEditing ? handleUpdate : addStudent}
@@ -270,26 +252,24 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Section */}
+      {/* Filter */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center space-x-4">
           <h3 className="text-lg font-medium">Filtres:</h3>
           <select
             value={filterGroup}
-            onChange={(e) => setFilterGroup(e.target.value)}
+            onChange={e => setFilterGroup(e.target.value)}
             className="p-2 border rounded"
           >
             <option value="">Tous les groupes</option>
-            {groups.map(group => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
+            {groups.map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Students List Stats */}
+      {/* Stats */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="text-center p-3 bg-blue-50 rounded">
@@ -311,72 +291,63 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Student List - Mobile View */}
+      {/* Mobile */}
       <div className="block sm:hidden">
         <div className="space-y-4">
-          {filteredStudents.map((student) => (
-            <div key={student.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {/* Student Info */}
+          {filteredStudents.map(stu => (
+            <div key={stu.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="p-4 border-b">
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {student.firstName} {student.lastName}
+                      {stu.firstName} {stu.lastName}
                     </h3>
                     <p className="text-sm text-gray-500 mt-1">
-                      Inscrit le: {formatDateToFrench(new Date(student.dateOfRegistration))}
+                      Inscrit le: {formatDateToFrench(new Date(stu.dateOfRegistration))}
                     </p>
                   </div>
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                    student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                    stu.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                   }`}>
-                    {student.paid ? "Payé" : "Non payé"}
+                    {stu.paid ? "Payé" : "Non payé"}
                   </span>
                 </div>
               </div>
 
-              {/* Details */}
               <div className="px-4 py-3 bg-gray-50 border-b space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Groupe:</span>
-                  <span className="font-medium">{getGroupInfo(student.groupId).name}</span>
+                  <span className="font-medium">{stu.groupId}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Cours suivis:</span>
-                  <span className="font-medium">{student.lessonsAttended}</span>
+                  <span className="font-medium">{stu.lessonsAttended}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Montant dû:</span>
-                  <span className="font-medium text-blue-600">
-                    {calculatePayment(
-                      student.groupId, 
-                      student.lessonsAttended,
-                      student.dateOfRegistration
-                    )}€
-                  </span>
+                  <span className="font-medium text-blue-600">{stu.montant}€</span>
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="p-3 grid grid-cols-3 gap-2">
                 <button
-                  onClick={() => togglePaymentStatus(student.id, student.paid)}
+                  onClick={() => togglePaidStatus(stu.id, stu.paid)}
                   className={`px-3 py-2 text-sm rounded-md ${
-                    student.paid
+                    stu.paid
                       ? "bg-red-50 text-red-700 hover:bg-red-100"
                       : "bg-green-50 text-green-700 hover:bg-green-100"
                   }`}
                 >
-                  {student.paid ? "Marquer non payé" : "Marquer payé"}
+                  {stu.paid ? "Marquer non payé" : "Marquer payé"}
                 </button>
                 <button
-                  onClick={() => handleEdit(student)}
+                  onClick={() => handleEdit(stu)}
                   className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
                 >
                   Modifier
                 </button>
                 <button
-                  onClick={() => deleteStudent(student.id)}
+                  onClick={() => deleteStudent(stu.id)}
                   className="px-3 py-2 text-sm bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100"
                 >
                   Supprimer
@@ -387,65 +358,77 @@ const Students: React.FC = () => {
         </div>
       </div>
 
-      {/* Student Table - Desktop View */}
+      {/* Desktop */}
       <div className="hidden sm:block bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Étudiant</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Groupe</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cours Suivis</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Étudiant
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Groupe
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Cours Suivis
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Montant
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Statut
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50">
+              {filteredStudents.map(stu => (
+                <tr key={stu.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{student.firstName} {student.lastName}</div>
+                    <div className="font-medium text-gray-900">
+                      {stu.firstName} {stu.lastName}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {getGroupInfo(student.groupId).name}
+                    {stu.groupId}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {student.lessonsAttended}
+                    {stu.lessonsAttended}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {calculatePayment(
-                      student.groupId, 
-                      student.lessonsAttended,
-                      student.dateOfRegistration
-                    )}DT
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                    {stu.montant}€
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      student.paid ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      stu.paid
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                     }`}>
-                      {student.paid ? "Payé" : "Non payé"}
+                      {stu.paid ? "Payé" : "Non payé"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => togglePaymentStatus(student.id, student.paid)}
+                      onClick={() => togglePaidStatus(stu.id, stu.paid)}
                       className={`mr-2 px-3 py-1 rounded-md ${
-                        student.paid
+                        stu.paid
                           ? "bg-red-100 text-red-700 hover:bg-red-200"
                           : "bg-green-100 text-green-700 hover:bg-green-200"
                       }`}
                     >
-                      {student.paid ? "Marquer comme non payé" : "Marquer comme payé"}
+                      {stu.paid ? "Marquer non payé" : "Marquer payé"}
                     </button>
                     <button
-                      onClick={() => handleEdit(student)}
+                      onClick={() => handleEdit(stu)}
                       className="mr-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
                     >
                       Modifier
                     </button>
                     <button
-                      onClick={() => deleteStudent(student.id)}
+                      onClick={() => deleteStudent(stu.id)}
                       className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
                     >
                       Supprimer

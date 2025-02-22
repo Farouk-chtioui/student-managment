@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from 'react';
+import { initializeFirestore } from './utils/firebase-init';
 import Login from "./pages/Login";
 import Students from "./pages/Students";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -6,8 +8,13 @@ import Attendance from "./pages/Attendance";
 import Groups from "./pages/Groups";
 import Dashboard from "./pages/Dashboard";
 import Layout from "./components/Layout";
+import PaymentHistory from "./pages/PaymentHistory";
 
 const App: React.FC = () => {
+  useEffect(() => {
+    initializeFirestore();
+  }, []);
+
   return (
     <Router>
       <Routes>
@@ -37,6 +44,13 @@ const App: React.FC = () => {
           <ProtectedRoute>
             <Layout>
               <Groups />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/payment-history/:studentId" element={
+          <ProtectedRoute>
+            <Layout>
+              <PaymentHistory />
             </Layout>
           </ProtectedRoute>
         } />

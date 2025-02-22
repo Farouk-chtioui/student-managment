@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore";
 import { Group, Schedule } from "../types";
 import GroupCache from '../utils/cache';
 import { formatDateToFrench } from '../utils/dateUtils';
@@ -20,18 +20,29 @@ const Groups: React.FC = () => {
     'friday', 'saturday', 'sunday'
   ];
 
+  // Add error state
+  const [error, setError] = useState<string | null>(null);
+
   const getNextDay = (currentDay: Schedule['day']): Schedule['day'] => {
     const currentIndex = weekDays.indexOf(currentDay);
     return weekDays[(currentIndex + 1) % weekDays.length] as Schedule['day'];
   };
 
   const fetchGroups = async () => {
-    const querySnapshot = await getDocs(collection(db, "groups"));
-    const groupList = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Group[];
-    setGroups(groupList);
+    try {
+      const querySnapshot = await getDocs(collection(db, "groups"));
+      const groupList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        schedule: doc.data().schedule || [] // Ensure schedule always exists
+      })) as Group[];
+      setGroups(groupList);
+      setError(null);
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+      setGroups([]); // Set empty array on error
+      setError("Erreur lors du chargement des groupes");
+    }
   };
 
   useEffect(() => {
@@ -39,7 +50,7 @@ const Groups: React.FC = () => {
   }, []);
 
   const addSchedule = () => {
-    setSchedules([...schedules, { day: currentDay, time: '08:00' }]);
+    setSchedules([...schedules, { day: currentDay as Schedule['day'], time: '08:00' }]);
     setCurrentDay(getNextDay(currentDay));
   };
 
@@ -57,20 +68,25 @@ const Groups: React.FC = () => {
   };
 
   const addGroup = async () => {
-    if (!name || feePerSession <= 0 || schedules.length === 0) {
-      alert("Veuillez remplir tous les champs obligatoires");
-      return;
+    try {
+      if (!name || feePerSession <= 0 || schedules.length === 0) {
+        alert("Veuillez remplir tous les champs obligatoires");
+        return;
+      }
+      
+      await addDoc(collection(db, "groups"), {
+        name,
+        feePerSession,
+        description,
+        schedule: schedules
+      });
+      
+      fetchGroups();
+      clearForm();
+    } catch (error) {
+      console.error("Error adding group:", error);
+      alert("Erreur lors de l'ajout du groupe");
     }
-    
-    await addDoc(collection(db, "groups"), {
-      name,
-      feePerSession,
-      description,
-      schedule: schedules
-    });
-    
-    fetchGroups();
-    clearForm();
   };
 
   const handleEdit = (group: Group) => {
@@ -131,13 +147,13 @@ const Groups: React.FC = () => {
     
     const historyMessage = feeHistory.length > 0 
       ? "\n\nHistorique des tarifs:\n" + feeHistory.map(h => 
-          `- ${h.feePerSession}€ (${formatDateToFrench(new Date(h.startDate))} - ${formatDateToFrench(new Date(h.endDate))})`
+          `- ${h.feePerSession}DT (${formatDateToFrench(new Date(h.startDate))} - ${formatDateToFrench(new Date(h.endDate))})`
         ).join('\n')
       : '';
 
     const confirmDelete = window.confirm(
       `Êtes-vous sûr de vouloir supprimer le groupe "${group.name}" ?` +
-      `\n\nTarif actuel: ${group.feePerSession}€` +
+      `\n\nTarif actuel: ${group.feePerSession}DT` +
       `${historyMessage}` +
       `\n\nLes données et l'historique des tarifs seront conservés dans le cache.`
     );
@@ -151,6 +167,12 @@ const Groups: React.FC = () => {
     <div>
       <h1 className="text-2xl lg:text-3xl font-bold mb-6">Gestion des Groupes</h1>
       
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-4 lg:p-6 mb-6">
         {/* Form Header */}
         <h2 className="text-lg lg:text-xl font-semibold mb-6">
@@ -291,14 +313,14 @@ const Groups: React.FC = () => {
       {/* Mobile View */}
       <div className="block lg:hidden">
         <div className="grid gap-4">
-          {groups.map(group => (
+          {Array.isArray(groups) && groups.map(group => (
             <div key={group.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               {/* Header */}
               <div className="p-4 border-b">
                 <div className="flex justify-between items-start">
                   <h3 className="font-medium text-lg">{group.name}</h3>
                   <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-sm font-medium">
-                    {group.feePerSession}€/séance
+                    {group.feePerSession}DT/séance
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">{group.description || "Aucune description"}</p>
@@ -352,12 +374,12 @@ const Groups: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {groups.map(group => (
+            {Array.isArray(groups) && groups.map(group => (
               <tr key={group.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">{group.name}</td>
                 <td className="px-4 py-3">
                   <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm">
-                    {group.feePerSession}€
+                    {group.feePerSession}DT
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-sm">{group.description}</td>
@@ -377,6 +399,13 @@ const Groups: React.FC = () => {
                 </td>
               </tr>
             ))}
+            {(!groups || groups.length === 0) && (
+              <tr>
+                <td colSpan={4} className="px-4 py-3 text-center text-gray-500">
+                  Aucun groupe trouvé
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
