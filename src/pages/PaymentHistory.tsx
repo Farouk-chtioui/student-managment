@@ -80,7 +80,7 @@ const PaymentHistory: React.FC = () => {
                   {formatDateToFrench(new Date(h.sessionDate))}
                 </td>
                 <td className="px-4 py-3">{h.sessionTime}</td>
-                <td className="px-4 py-3">{h.amount}€</td>
+                <td className="px-4 py-3">{h.amount}DT</td>
                 <td className="px-4 py-3">
                   {formatDateToFrench(new Date(h.paidAt))}
                 </td>

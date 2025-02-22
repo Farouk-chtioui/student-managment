@@ -353,21 +353,21 @@ const AttendancePage: React.FC = () => {
                                 {/* Present toggle */}
                                 <button
                                   onClick={() => togglePresent(student.id, dateStr, lesson.time)}
-                                  className={`px-2 py-1 text-xs rounded ${
+                                  className={`px-3 py-1 text-xs rounded-full transition shadow-sm ${
                                     !present
-                                      ? "bg-gray-100 text-gray-500"
-                                      : "bg-green-100 text-green-700 border border-green-500"
+                                      ? "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                                      : "bg-green-500 text-white hover:bg-green-600"
                                   }`}
                                 >
-                                  {present ? "Présent" : "?"}
+                                  {present ? "Présent" : "Absent"}
                                 </button>
                                 {/* Paid toggle */}
                                 <button
                                   onClick={() => togglePaid(student.id, dateStr, lesson.time)}
-                                  className={`px-2 py-1 text-xs rounded ${
+                                  className={`px-3 py-1 text-xs rounded-full transition shadow-sm ${
                                     paid
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-red-100 text-red-700"
+                                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                                      : "bg-red-500 text-white hover:bg-red-600"
                                   }`}
                                 >
                                   {paid ? "Payé" : "Non payé"}
@@ -425,22 +425,22 @@ const AttendancePage: React.FC = () => {
                                   {/* Present toggle */}
                                   <button
                                     onClick={() => togglePresent(student.id, dateStr, lesson.time)}
-                                    className={`px-2 py-1 text-xs rounded ${
+                                    className={`px-3 py-1 text-xs rounded-full transition shadow-sm ${
                                       !present
-                                        ? "bg-gray-100 text-gray-500"
-                                        : "bg-green-100 text-green-700 border border-green-500"
+                                        ? "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                                        : "bg-green-500 text-white hover:bg-green-600"
                                     }`}
                                   >
-                                    {present ? "Présent" : "?"}
+                                    {present ? "Présent" : "Absent"}
                                   </button>
                                   {/* Paid toggle */}
                                   {present && (
                                     <button
                                       onClick={() => togglePaid(student.id, dateStr, lesson.time)}
-                                      className={`px-2 py-1 text-xs rounded ${
+                                      className={`px-3 py-1 text-xs rounded-full transition shadow-sm ${
                                         paid
-                                          ? "bg-blue-100 text-blue-700"
-                                          : "bg-red-100 text-red-700"
+                                          ? "bg-blue-500 text-white hover:bg-blue-600"
+                                          : "bg-red-500 text-white hover:bg-red-600"
                                       }`}
                                     >
                                       {paid ? "Payé" : "Non payé"}
@@ -492,7 +492,7 @@ const AttendancePage: React.FC = () => {
                       </div>
                       <div className="p-3">
                         <div className="text-sm font-medium mb-2">
-                          Montant dû: {totalDue}€
+                          Montant dû: {totalDue}DT
                         </div>
                         <div className="text-sm text-gray-500">
                           Nombre de cours suivis : {student.lessonsAttended}

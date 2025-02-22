@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { Group, Schedule } from "../types";
 import GroupCache from '../utils/cache';
 import { formatDateToFrench } from '../utils/dateUtils';
@@ -13,11 +13,13 @@ const Groups: React.FC = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  // Updated initial day to French
   const [currentDay, setCurrentDay] = useState<Schedule['day']>('monday');
 
+  // Use French days
   const weekDays = [
-    'monday', 'tuesday', 'wednesday', 'thursday', 
-    'friday', 'saturday', 'sunday'
+    'lundi', 'mardi', 'mercredi', 'jeudi', 
+    'vendredi', 'samedi', 'dimanche'
   ];
 
   // Add error state
@@ -123,17 +125,10 @@ const Groups: React.FC = () => {
 
   const deleteGroup = async (id: string) => {
     try {
-      // First, get the group data before deletion
       const groupToDelete = groups.find(g => g.id === id);
       if (!groupToDelete) return;
-
-      // Cache the group data with paymentHistory added
       GroupCache.saveDeletedGroup({ ...groupToDelete, paymentHistory: [] });
-
-      // Perform the deletion
       await deleteDoc(doc(db, "groups", id));
-      
-      // Update local state
       fetchGroups();
     } catch (error) {
       console.error("Error deleting group:", error);
@@ -174,13 +169,11 @@ const Groups: React.FC = () => {
       )}
 
       <div className="bg-white rounded-lg shadow p-4 lg:p-6 mb-6">
-        {/* Form Header */}
         <h2 className="text-lg lg:text-xl font-semibold mb-6">
           {isEditing ? "Modifier le Groupe" : "Ajouter un Nouveau Groupe"}
         </h2>
 
         <div className="space-y-6">
-          {/* Basic Info */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="block text-sm font-medium text-gray-700">Nom du groupe</label>
@@ -212,7 +205,6 @@ const Groups: React.FC = () => {
             />
           </div>
 
-          {/* Schedule Section with Modern List */}
           <div className="bg-white rounded-xl border p-4">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-base font-semibold text-gray-900">Horaires de cours</h3>
@@ -284,7 +276,6 @@ const Groups: React.FC = () => {
             </div>
           </div>
 
-          {/* Action Buttons - Centered */}
           <div className="flex justify-center pt-4">
             <div className="space-x-3">
               <button
@@ -310,12 +301,10 @@ const Groups: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile View */}
       <div className="block lg:hidden">
         <div className="grid gap-4">
           {Array.isArray(groups) && groups.map(group => (
             <div key={group.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {/* Header */}
               <div className="p-4 border-b">
                 <div className="flex justify-between items-start">
                   <h3 className="font-medium text-lg">{group.name}</h3>
@@ -326,7 +315,6 @@ const Groups: React.FC = () => {
                 <p className="text-sm text-gray-600 mt-1">{group.description || "Aucune description"}</p>
               </div>
 
-              {/* Schedule List */}
               <div className="px-4 py-2 bg-gray-50 border-b">
                 <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Horaires</h4>
                 <div className="space-y-1">
@@ -342,7 +330,6 @@ const Groups: React.FC = () => {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="p-3 flex gap-2">
                 <button
                   onClick={() => handleEdit(group)}
@@ -362,7 +349,6 @@ const Groups: React.FC = () => {
         </div>
       </div>
 
-      {/* Desktop View */}
       <div className="hidden lg:block bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead>

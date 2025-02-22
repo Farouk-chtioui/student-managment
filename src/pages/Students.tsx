@@ -325,21 +325,11 @@ const Students: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Montant dû:</span>
-                  <span className="font-medium text-blue-600">{stu.montant}€</span>
+                  <span className="font-medium text-blue-600">{stu.montant}DT</span>
                 </div>
               </div>
 
-              <div className="p-3 grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => togglePaidStatus(stu.id, stu.paid)}
-                  className={`px-3 py-2 text-sm rounded-md ${
-                    stu.paid
-                      ? "bg-red-50 text-red-700 hover:bg-red-100"
-                      : "bg-green-50 text-green-700 hover:bg-green-100"
-                  }`}
-                >
-                  {stu.paid ? "Marquer non payé" : "Marquer payé"}
-                </button>
+              <div className="p-3 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleEdit(stu)}
                   className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
@@ -399,7 +389,7 @@ const Students: React.FC = () => {
                     {stu.lessonsAttended}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                    {stu.montant}€
+                    {stu.montant}DT
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -411,16 +401,6 @@ const Students: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => togglePaidStatus(stu.id, stu.paid)}
-                      className={`mr-2 px-3 py-1 rounded-md ${
-                        stu.paid
-                          ? "bg-red-100 text-red-700 hover:bg-red-200"
-                          : "bg-green-100 text-green-700 hover:bg-green-200"
-                      }`}
-                    >
-                      {stu.paid ? "Marquer non payé" : "Marquer payé"}
-                    </button>
                     <button
                       onClick={() => handleEdit(stu)}
                       className="mr-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200"
