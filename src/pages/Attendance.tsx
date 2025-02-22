@@ -22,6 +22,37 @@ function toYMD(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 }
+
+const getDateForWeekday = (day: string, ref: Date): Date => {
+  const daysMap: { [key: string]: number } = {
+    "lundi": 1,
+    "mardi": 2,
+    "mercredi": 3,
+    "jeudi": 4,
+    "vendredi": 5,
+    "samedi": 6,
+    "dimanche": 7  // changed from 0 to 7
+  };
+  const refDay = ref.getDay() === 0 ? 7 : ref.getDay();
+  const monday = new Date(ref);
+  monday.setDate(ref.getDate() - (refDay - 1));
+  const targetDay = daysMap[day.toLowerCase()]!;
+  const target = new Date(monday);
+  target.setDate(monday.getDate() + (targetDay - 1));
+  return target;
+};
+
+const getWeekRange = (ref: Date) => {
+  const day = ref.getDay();
+  // Calculate difference to Monday (treat Sunday as day 0, so subtract 6)
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  const monday = new Date(ref);
+  monday.setDate(ref.getDate() - diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { monday, sunday };
+};
+
 const AttendancePage: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -63,7 +94,7 @@ const AttendancePage: React.FC = () => {
   };
 
   const fetchGroupLessons = () => {
-    const g = groups.find(x => x.id === selectedGroup);
+    const g = groups.find(x => x.name === selectedGroup);
     if (g) {
       setLessons(g.schedule);
     }
@@ -80,9 +111,15 @@ const AttendancePage: React.FC = () => {
   };
 
   const fetchAttendanceDocs = async () => {
-    const startStr = toYMD(new Date(currentYear, currentMonth, 1));
-    const endStr = toYMD(new Date(currentYear, currentMonth + 1, 0));
-
+    // OLD:
+    // const startStr = toYMD(new Date(currentYear, currentMonth, 1));
+    // const endStr = toYMD(new Date(currentYear, currentMonth + 1, 0));
+    
+    // NEW: Use the current week from today as boundaries
+    const { monday, sunday } = getWeekRange(new Date());
+    const startStr = toYMD(monday);
+    const endStr = toYMD(sunday);
+    
     const qAtt = query(
       collection(db, "attendance"),
       where("groupId", "==", selectedGroup),
@@ -258,7 +295,7 @@ const AttendancePage: React.FC = () => {
   };
 
   const getGroupFee = (groupId: string): number => {
-    const g = groups.find(x => x.id === groupId);
+    const g = groups.find(x => x.name === groupId);
     if (!g) return 0;
     return g.feePerSession;
   };
@@ -292,7 +329,8 @@ const AttendancePage: React.FC = () => {
         >
           <option value="">Sélectionner un Groupe</option>
           {groups.map(g => (
-            <option key={g.id} value={g.id}>{g.name}</option>
+            // Change value from g.id to g.name to match what is stored in students documents
+            <option key={g.id} value={g.name}>{g.name}</option>
           ))}
         </select>
 
@@ -338,7 +376,8 @@ const AttendancePage: React.FC = () => {
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
                         {lessons.map((lesson, idx) => {
-                          const dateObj = new Date(currentYear, currentMonth, idx+1);
+                          const { monday } = getWeekRange(new Date());
+                          const dateObj = getDateForWeekday(lesson.day, monday);
                           const dateStr = toYMD(dateObj);
                           const att = attendanceMap[buildKey(student.id, dateStr, lesson.time)];
                           const present = att?.present ?? false;
@@ -390,7 +429,8 @@ const AttendancePage: React.FC = () => {
                           Étudiant
                         </th>
                         {lessons.map((lesson, idx) => {
-                          const dateObj = new Date(currentYear, currentMonth, idx+1);
+                          const { monday } = getWeekRange(new Date());
+                          const dateObj = getDateForWeekday(lesson.day, monday);
                           return (
                             <th key={idx} className="px-6 py-3 bg-gray-50 text-left">
                               <div className="text-xs font-medium text-gray-500 uppercase">
@@ -413,7 +453,8 @@ const AttendancePage: React.FC = () => {
                             </div>
                           </td>
                           {lessons.map((lesson, idx) => {
-                            const dateObj = new Date(currentYear, currentMonth, idx+1);
+                            const { monday } = getWeekRange(new Date());
+                            const dateObj = getDateForWeekday(lesson.day, monday);
                             const dateStr = toYMD(dateObj);
                             const att = attendanceMap[buildKey(student.id, dateStr, lesson.time)];
                             const present = att?.present ?? false;
